@@ -1,7 +1,12 @@
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
-const { MongoClient, ServerApiVersion, ObjectID } = require("mongodb");
+const {
+  MongoClient,
+  ServerApiVersion,
+  ObjectID,
+  ObjectId,
+} = require("mongodb");
 require("dotenv").config();
 const port = process.env.PORT || 5000;
 
@@ -55,8 +60,12 @@ async function run() {
       const categories = await cursor.toArray();
       res.send(categories);
     });
-    app.get("/bookings", verifyJWT, async (req, res) => {
+    app.get("/bookings", async (req, res) => {
       const email = req.query.email;
+      // const decodedEmail = req.decoded.email;
+      // if (email !== decodedEmail) {
+      //   return res.status(403).send({ message: "forbidden access" });
+      // }
       const query = { email: email };
       const bookings = await bookingsCollection.find(query).toArray();
       res.send(bookings);
@@ -88,9 +97,36 @@ async function run() {
       }
       res.status(403).send({ accessToken: "" });
     });
+    app.get("/users", async (req, res) => {
+      const query = {};
+      const users = await usersCollection.find(query).toArray();
+      res.send(users);
+    });
     app.post("/users", async (req, res) => {
       const users = req.body;
       const result = await usersCollection.insertOne(users);
+      res.send(result);
+    });
+    app.put("/users/admin/:id", verifyJWT, async (req, res) => {
+      const decodedEmail = req.decoded.email;
+      const query = { email: decodedEmail };
+      const user = await usersCollection.findOne(query);
+      if (user?.role !== "admin") {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+      const options = { upsert: true };
+      const updatedDoc = {
+        $set: {
+          role: "admin",
+        },
+      };
+      const result = await usersCollection.updateOne(
+        filter,
+        updatedDoc,
+        options
+      );
       res.send(result);
     });
   } finally {
