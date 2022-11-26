@@ -25,6 +25,7 @@ async function run() {
       .db("carBazarDB")
       .collection("categories");
     const bookingsCollection = client.db("carBazarDB").collection("bookings");
+    const buyersCollection = client.db("carBazarDB").collection("buyers");
 
     app.get("/brands", async (req, res) => {
       const query = {};
@@ -58,6 +59,11 @@ async function run() {
         return res.send({ acknowledged: false, message });
       }
       const result = await bookingsCollection.insertOne(booking);
+      res.send(result);
+    });
+    app.post("/buyers", async (req, res) => {
+      const buyers = req.body;
+      const result = await buyersCollection.insertOne(buyers);
       res.send(result);
     });
   } finally {
