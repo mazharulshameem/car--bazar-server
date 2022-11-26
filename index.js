@@ -24,6 +24,8 @@ async function run() {
     const categoriesCollection = client
       .db("carBazarDB")
       .collection("categories");
+    const bookingsCollection = client.db("carBazarDB").collection("bookings");
+
     app.get("/brands", async (req, res) => {
       const query = {};
       const cursor = categoriesCollection.find(query);
@@ -36,6 +38,22 @@ async function run() {
       const cursor = brandCollection.find(query);
       const categories = await cursor.toArray();
       res.send(categories);
+    });
+    app.post("/bookings", async (req, res) => {
+      const booking = req.body;
+      console.log(booking);
+      const query = {
+        product: booking.product,
+      };
+      const alreadyBooked = await bookingsCollection.find(query).toArray();
+      if (alreadyBooked.length) {
+        const message = `You already have a booking`;
+        return res.send({ acknowledged: false, message });
+      }
+
+      const result = await bookingsCollection.insertOne(booking);
+
+      res.send(result);
     });
   } finally {
   }
