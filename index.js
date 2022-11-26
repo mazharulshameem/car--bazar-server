@@ -18,7 +18,21 @@ const client = new MongoClient(uri, {
   useUnifiedTopology: true,
   serverApi: ServerApiVersion.v1,
 });
+function verifyJWT(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).send("unauthorized access");
+  }
+  const token = authHeader.split(" ")[1];
 
+  jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
+    if (err) {
+      return res.status(403).send({ message: "forbidden access" });
+    }
+    req.decoded = decoded;
+    next();
+  });
+}
 async function run() {
   try {
     const brandCollection = client.db("carBazarDB").collection("brands");
@@ -26,7 +40,7 @@ async function run() {
       .db("carBazarDB")
       .collection("categories");
     const bookingsCollection = client.db("carBazarDB").collection("bookings");
-    const buyersCollection = client.db("carBazarDB").collection("buyers");
+    const usersCollection = client.db("carBazarDB").collection("users");
 
     app.get("/brands", async (req, res) => {
       const query = {};
@@ -41,9 +55,8 @@ async function run() {
       const categories = await cursor.toArray();
       res.send(categories);
     });
-    app.get("/bookings", async (req, res) => {
+    app.get("/bookings", verifyJWT, async (req, res) => {
       const email = req.query.email;
-      console.log("token", req.headers.authorization);
       const query = { email: email };
       const bookings = await bookingsCollection.find(query).toArray();
       res.send(bookings);
@@ -66,8 +79,8 @@ async function run() {
     app.get("/jwt", async (req, res) => {
       const email = req.query.email;
       const query = { email: email };
-      const buyer = await buyersCollection.findOne(query);
-      if (buyer) {
+      const user = await usersCollection.findOne(query);
+      if (user) {
         const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
           expiresIn: "1h",
         });
@@ -75,9 +88,9 @@ async function run() {
       }
       res.status(403).send({ accessToken: "" });
     });
-    app.post("/buyers", async (req, res) => {
-      const buyers = req.body;
-      const result = await buyersCollection.insertOne(buyers);
+    app.post("/users", async (req, res) => {
+      const users = req.body;
+      const result = await usersCollection.insertOne(users);
       res.send(result);
     });
   } finally {
