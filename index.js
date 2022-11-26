@@ -46,6 +46,7 @@ async function run() {
       .collection("categories");
     const bookingsCollection = client.db("carBazarDB").collection("bookings");
     const usersCollection = client.db("carBazarDB").collection("users");
+    const productsCollection = client.db("carBazarDB").collection("products");
 
     app.get("/brands", async (req, res) => {
       const query = {};
@@ -70,13 +71,21 @@ async function run() {
     //   const bookings = await bookingsCollection.find(query).toArray();
     //   res.send(bookings);
     // });
-    app.get("/bookings", async (req, res) => {
+    app.get("/productsCategory", async (req, res) => {
+      const query = {};
+      const result = await categoriesCollection
+        .find(query)
+        .project({ category_name: 1 })
+        .toArray();
+      res.send(result);
+    });
+    app.get("/bookings", verifyJWT, async (req, res) => {
       const email = req.query.email;
-      // const decodedEmail = req.decoded.email;
+      const decodedEmail = req.decoded.email;
 
-      // if (email !== decodedEmail) {
-      //   return res.status(403).send({ message: "forbidden access" });
-      // }
+      if (email !== decodedEmail) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
 
       const query = { email: email };
       const bookings = await bookingsCollection.find(query).toArray();
@@ -119,6 +128,16 @@ async function run() {
       const query = { email };
       const user = await usersCollection.findOne(query);
       res.send({ isAdmin: user?.role === "admin" });
+    });
+    app.get("/products", async (req, res) => {
+      const query = {};
+      const products = await productsCollection.find(query).toArray();
+      res.send(products);
+    });
+    app.post("/products", async (req, res) => {
+      const product = req.body;
+      const result = await productsCollection.insertOne(product);
+      res.send(result);
     });
     app.post("/users", async (req, res) => {
       const users = req.body;
