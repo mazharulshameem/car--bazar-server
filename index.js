@@ -8,6 +8,7 @@ const {
   ObjectId,
 } = require("mongodb");
 require("dotenv").config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const port = process.env.PORT || 5000;
 
 const app = express();
@@ -38,10 +39,15 @@ function verifyJWT(req, res, next) {
     next();
   });
 }
-function verifyAdmin(req, res, next) {
-  console.log("inside verify Admin", req.decoded.email);
+const verifyAdmin = async (req, res, next) => {
+  const decodedEmail = req.decoded.email;
+  const query = { email: decodedEmail };
+  const user = await usersCollection.findOne(query);
+  if (user?.role !== "admin") {
+    return res.status(403).send({ message: "forbidden access" });
+  }
   next();
-}
+};
 async function run() {
   try {
     const brandCollection = client.db("carBazarDB").collection("brands");
@@ -65,16 +71,6 @@ async function run() {
       const categories = await cursor.toArray();
       res.send(categories);
     });
-    // app.get("/bookings", async (req, res) => {
-    //   const email = req.query.email;
-    //   // const decodedEmail = req.decoded.email;
-    //   // if (email !== decodedEmail) {
-    //   //   return res.status(403).send({ message: "forbidden access" });
-    //   // }
-    //   const query = { email: email };
-    //   const bookings = await bookingsCollection.find(query).toArray();
-    //   res.send(bookings);
-    // });
     app.get("/productsCategory", async (req, res) => {
       const query = {};
       const result = await categoriesCollection
@@ -95,6 +91,12 @@ async function run() {
       const bookings = await bookingsCollection.find(query).toArray();
       res.send(bookings);
     });
+    app.get("/bookings/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const booking = await bookingsCollection.findOne(query);
+      res.send(booking);
+    });
     app.post("/bookings", async (req, res) => {
       const booking = req.body;
       // console.log(booking);
@@ -109,6 +111,20 @@ async function run() {
       }
       const result = await bookingsCollection.insertOne(booking);
       res.send(result);
+    });
+    app.post("/create-payment-intent", async (req, res) => {
+      const booking = req.body;
+      const resale_price = booking.resale_price;
+      const amount = resale_price * 100;
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        currency: "usd",
+        amount: amount,
+        payment_method_types: ["card"],
+      });
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
     });
     app.get("/jwt", async (req, res) => {
       const email = req.query.email;
@@ -133,7 +149,7 @@ async function run() {
       const user = await usersCollection.findOne(query);
       res.send({ isAdmin: user?.role === "admin" });
     });
-    app.get("/products", verifyJWT, verifyAdmin, async (req, res) => {
+    app.get("/products", verifyJWT, async (req, res) => {
       const query = {};
       const products = await productsCollection.find(query).toArray();
       res.send(products);
@@ -148,13 +164,7 @@ async function run() {
       const result = await usersCollection.insertOne(users);
       res.send(result);
     });
-    app.put("/users/admin/:id", verifyJWT, async (req, res) => {
-      const decodedEmail = req.decoded.email;
-      const query = { email: decodedEmail };
-      const user = await usersCollection.findOne(query);
-      if (user?.role !== "admin") {
-        return res.status(403).send({ message: "forbidden access" });
-      }
+    app.put("/users/admin/:id", verifyJWT, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: ObjectId(id) };
       const options = { upsert: true };
