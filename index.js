@@ -38,6 +38,10 @@ function verifyJWT(req, res, next) {
     next();
   });
 }
+function verifyAdmin(req, res, next) {
+  console.log("inside verify Admin", req.decoded.email);
+  next();
+}
 async function run() {
   try {
     const brandCollection = client.db("carBazarDB").collection("brands");
@@ -129,12 +133,12 @@ async function run() {
       const user = await usersCollection.findOne(query);
       res.send({ isAdmin: user?.role === "admin" });
     });
-    app.get("/products", async (req, res) => {
+    app.get("/products", verifyJWT, verifyAdmin, async (req, res) => {
       const query = {};
       const products = await productsCollection.find(query).toArray();
       res.send(products);
     });
-    app.post("/products", async (req, res) => {
+    app.post("/products", verifyJWT, async (req, res) => {
       const product = req.body;
       const result = await productsCollection.insertOne(product);
       res.send(result);
